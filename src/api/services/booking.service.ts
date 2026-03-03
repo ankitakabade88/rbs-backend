@@ -8,9 +8,10 @@ import { SortOrder, Types } from "mongoose";
 export interface CreateBookingDTO {
   employee: string;
   room: string;
-  date: string | Date;
+  date: string;
   startTime: string;
   endTime: string;
+  purpose?: string;
 }
 
 export interface UpdateBookingDTO {
@@ -23,6 +24,7 @@ export interface UpdateBookingDTO {
 /* =======================
    Helpers
 ======================= */
+
 const normalizeDate = (date: string | Date): Date => {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
@@ -39,6 +41,15 @@ const assertDefined = <T>(
   return value;
 };
 
+/* ===== TIME → MINUTES ===== */
+const toMinutes = (time: string) => {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+};
+
+/* =======================
+   CONFLICT CHECK
+======================= */
 const hasBookingConflict = async (
   room: string,
   date: Date,
@@ -46,28 +57,38 @@ const hasBookingConflict = async (
   endTime: string,
   excludeBookingId?: string
 ) => {
-  const query: any = {
+  const bookings = await Booking.find({
     room: new Types.ObjectId(room),
     date,
-    startTime: { $lt: endTime },
-    endTime: { $gt: startTime },
-  };
+    ...(excludeBookingId && {
+      _id: { $ne: new Types.ObjectId(excludeBookingId) },
+    }),
+  });
 
-  if (excludeBookingId) {
-    query._id = { $ne: new Types.ObjectId(excludeBookingId) };
+  const newStart = toMinutes(startTime);
+  const newEnd = toMinutes(endTime);
+
+  for (const b of bookings) {
+    const existingStart = toMinutes(b.startTime);
+    const existingEnd = toMinutes(b.endTime);
+
+    const overlap =
+      newStart < existingEnd && newEnd > existingStart;
+
+    if (overlap) return true;
   }
 
-  return Booking.findOne(query);
+  return false;
 };
 
 /* =======================
    CREATE BOOKING
 ======================= */
-export const createBookingService = async (data: CreateBookingDTO) => {
+export const createBookingService = async (
+  data: CreateBookingDTO
+) => {
   const roomExists = await Room.findById(data.room);
-  if (!roomExists) {
-    throw new Error("Room does not exist");
-  }
+  if (!roomExists) throw new Error("Room does not exist");
 
   if (data.startTime >= data.endTime) {
     throw new Error("End time must be after start time");
@@ -83,7 +104,9 @@ export const createBookingService = async (data: CreateBookingDTO) => {
   );
 
   if (conflict) {
-    throw new Error("Room is already booked for the selected time slot");
+    throw new Error(
+      "Room already booked for the selected time slot"
+    );
   }
 
   const booking = await Booking.create({
@@ -101,7 +124,7 @@ export const createBookingService = async (data: CreateBookingDTO) => {
 };
 
 /* =======================
-   GET ALL BOOKINGS (ADMIN)
+   GET ALL BOOKINGS
 ======================= */
 export const getBookingsService = async (
   page: number,
@@ -128,7 +151,7 @@ export const getBookingsService = async (
 };
 
 /* =======================
-   GET BOOKING BY ID (OWNER)
+   GET BOOKING BY ID
 ======================= */
 export const getBookingByIdService = async (
   id: string,
@@ -157,7 +180,7 @@ export const getBookingByIdService = async (
 };
 
 /* =======================
-   UPDATE BOOKING (OWNER)
+   UPDATE BOOKING
 ======================= */
 export const updateBookingService = async (
   id: string,
@@ -172,16 +195,6 @@ export const updateBookingService = async (
     booking.employee,
     "Booking employee"
   );
-  const bookingRoom = assertDefined(booking.room, "Booking room");
-  const bookingDate = assertDefined(booking.date, "Booking date");
-  const bookingStartTime = assertDefined(
-    booking.startTime,
-    "Booking startTime"
-  );
-  const bookingEndTime = assertDefined(
-    booking.endTime,
-    "Booking endTime"
-  );
 
   if (
     role !== "admin" &&
@@ -190,19 +203,21 @@ export const updateBookingService = async (
     throw new Error("Forbidden");
   }
 
-  const updatedRoom = data.room ?? bookingRoom.toString();
-  const updatedDate = normalizeDate(data.date ?? bookingDate);
-  const updatedStartTime = data.startTime ?? bookingStartTime;
-  const updatedEndTime = data.endTime ?? bookingEndTime;
+  const updatedRoom = data.room ?? booking.room.toString();
+  const updatedDate = normalizeDate(
+    data.date ?? booking.date
+  );
+  const updatedStartTime =
+    data.startTime ?? booking.startTime;
+  const updatedEndTime =
+    data.endTime ?? booking.endTime;
 
   if (updatedStartTime >= updatedEndTime) {
     throw new Error("End time must be after start time");
   }
 
   const roomExists = await Room.findById(updatedRoom);
-  if (!roomExists) {
-    throw new Error("Room does not exist");
-  }
+  if (!roomExists) throw new Error("Room does not exist");
 
   const conflict = await hasBookingConflict(
     updatedRoom,
@@ -213,7 +228,9 @@ export const updateBookingService = async (
   );
 
   if (conflict) {
-    throw new Error("Room is already booked for the selected time slot");
+    throw new Error(
+      "Room already booked for the selected time slot"
+    );
   }
 
   return Booking.findByIdAndUpdate(
@@ -233,7 +250,7 @@ export const updateBookingService = async (
 };
 
 /* =======================
-   DELETE BOOKING (OWNER)
+   DELETE BOOKING
 ======================= */
 export const deleteBookingService = async (
   id: string,

@@ -5,6 +5,8 @@ import {
   getBookingById,
   updateBooking,
   deleteBooking,
+  getBookedSlots,
+  checkRoomAvailability, // ✅ NEW
 } from "../controllers/booking.controller";
 
 import {
@@ -20,8 +22,33 @@ import { validate } from "../../middlewares/validate.middleware";
 const router = Router();
 
 /*
+=====================================================
+CHECK ROOM AVAILABILITY (LIVE STATUS)
+IMPORTANT: must be ABOVE "/:id"
+=====================================================
+*/
+router.post(
+  "/check-availability",
+  authMiddleware,
+  checkRoomAvailability
+);
+
+/*
+=====================================================
+GET BOOKED TIME SLOTS
+=====================================================
+*/
+router.get(
+  "/slots",
+  authMiddleware,
+  getBookedSlots
+);
+
+/*
+=====================================================
 CREATE BOOKING
 User + Admin
+=====================================================
 */
 router.post(
   "/",
@@ -32,8 +59,9 @@ router.post(
 );
 
 /*
-GET ALL BOOKINGS
-Admin only
+=====================================================
+GET ALL BOOKINGS (ADMIN)
+=====================================================
 */
 router.get(
   "/",
@@ -43,9 +71,9 @@ router.get(
 );
 
 /*
+=====================================================
 GET BOOKING BY ID
-User (owner) + Admin
-(Service enforces ownership)
+=====================================================
 */
 router.get(
   "/:id",
@@ -54,9 +82,9 @@ router.get(
 );
 
 /*
+=====================================================
 UPDATE BOOKING
-User (owner) + Admin
-(Service enforces ownership)
+=====================================================
 */
 router.put(
   "/:id",
@@ -67,9 +95,9 @@ router.put(
 );
 
 /*
+=====================================================
 DELETE BOOKING
-User (owner) + Admin
-(Service enforces ownership)
+=====================================================
 */
 router.delete(
   "/:id",

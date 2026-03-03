@@ -3,7 +3,7 @@ import Booking from "../../models/booking.model";
 import { SortOrder } from "mongoose";
 
 /*
-CREATE ROOM (WITH DUPLICATE CHECK)
+CREATE ROOM
 */
 export const createRoomService = async (data: any) => {
   const existingRoom = await Room.findOne({ name: data.name });
@@ -26,7 +26,10 @@ export const getRoomsService = async (
   const skip = (page - 1) * limit;
 
   const rooms = await Room.find()
-    .select("name location capacity type createdAt")
+    // ✅ IMPORTANT FIX — include availability
+    .select(
+      "name location capacity type isAvailable createdAt"
+    )
     .sort(sort)
     .skip(skip)
     .limit(limit);
@@ -46,22 +49,25 @@ GET ROOM BY ID
 */
 export const getRoomByIdService = async (id: string) => {
   return Room.findById(id).select(
-    "name location capacity type createdAt"
+    "name location capacity type isAvailable createdAt"
   );
 };
 
-//UPDATE ROOM
-
+/*
+UPDATE ROOM
+*/
 export const updateRoomService = async (id: string, data: any) => {
   return Room.findByIdAndUpdate(
     id,
     { $set: data },
-    { new: true, runValidators: true } 
+    { new: true, runValidators: true }
   );
 };
 
-
-//Block deletion if bookings exist
+/*
+DELETE ROOM
+(Block if bookings exist)
+*/
 export const deleteRoomService = async (id: string) => {
   const bookingCount = await Booking.countDocuments({ room: id });
 

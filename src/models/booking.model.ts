@@ -1,41 +1,60 @@
-import { Schema, model } from "mongoose";
+import { Schema, model, Types, Document } from "mongoose";
 
-const bookingSchema = new Schema(
+export interface IBooking extends Document {
+  employee: Types.ObjectId;
+  room: Types.ObjectId;
+  date: Date;
+  startTime: string;
+  endTime: string;
+  purpose?: string;
+}
+
+const bookingSchema = new Schema<IBooking>(
   {
     employee: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: [true],
+      required: true,
+      index: true,
     },
 
     room: {
       type: Schema.Types.ObjectId,
       ref: "Room",
-      required: [true],
+      required: true,
+      index: true,
     },
 
     date: {
       type: Date,
-      required: [true],
+      required: true,
+      index: true, // ✅ dashboard speed
     },
 
     startTime: {
       type: String,
-      required: [true],
+      required: true,
+      trim: true,
     },
 
     endTime: {
       type: String,
-      required: [true],
+      required: true,
+      trim: true,
     },
 
     purpose: {
       type: String,
-      minlength: [3],
-      maxlength: [200],
+      trim: true,
+      default: "",
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-export default model("Booking", bookingSchema);
+/* compound index (VERY IMPORTANT) */
+bookingSchema.index({ room: 1, date: 1 });
+
+export default model<IBooking>("Booking", bookingSchema);

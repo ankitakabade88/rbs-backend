@@ -31,8 +31,8 @@ GET - Get All Rooms
 */
 export const getRooms = async (req: Request, res: Response) => {
   try {
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 5;
+    const page = Number(req.query.page);
+    const limit = Number(req.query.limit);
     const sortBy = (req.query.sortBy as string) || "createdAt";
     const order = req.query.order === "asc" ? 1 : -1;
 

@@ -61,7 +61,7 @@ router.put(
 );
 
 /**
- * DELETE ROOM (ADMIN + USER)
+ * DELETE ROOM (ADMIN)
  */
 router.delete(
   "/:id",

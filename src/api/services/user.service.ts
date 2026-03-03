@@ -1,9 +1,11 @@
 import User from "../../models/user.model";
 import Booking from "../../models/booking.model";
+import crypto from "crypto";
+import { sendInviteEmail } from "../../utils/sendInviteEmail";
 
 /*
-CREATE USER (PREVENT DUPLICATE EMAIL)
-ADMIN ONLY (enforced at controller/route level)
+CREATE USER (INVITE FLOW)
+ADMIN ONLY
 */
 export const createUser = async (data: any) => {
   const existingUser = await User.findOne({ email: data.email });
@@ -12,12 +14,36 @@ export const createUser = async (data: any) => {
     throw new Error("Email already exists");
   }
 
-  // Default role safety (if not provided)
+  // safety default
   if (!data.role) {
     data.role = "employee";
   }
 
-  return User.create(data);
+  /* ===== GENERATE INVITE TOKEN ===== */
+  const inviteToken = crypto.randomBytes(32).toString("hex");
+
+  const user = await User.create({
+    name: data.name,
+    email: data.email,
+    role: data.role,
+    password: null,
+    isActive: false,
+    inviteToken,
+    inviteTokenExpiry: new Date(
+      Date.now() + 24 * 60 * 60 * 1000
+    ),
+  });
+
+  /* ===== CREATE INVITE LINK ===== */
+  const inviteLink = `${process.env.FRONTEND_URL}/set-password?token=${inviteToken}`;
+
+  /* ===== SEND EMAIL ===== */
+  await sendInviteEmail(user.email, inviteLink);
+
+  return {
+    message: "User invited successfully",
+    inviteLink, // optional (for testing)
+  };
 };
 
 /*
@@ -62,11 +88,8 @@ export const findUserByEmail = async (email: string) => {
 
 /*
 UPDATE USER
-- Prevent duplicate email update
-- Password hashing handled by model pre-save
 */
 export const updateUserById = async (id: string, data: any) => {
-  // If email is being updated, ensure uniqueness
   if (data.email) {
     const existingUser = await User.findOne({
       email: data.email,
@@ -90,7 +113,6 @@ export const updateUserById = async (id: string, data: any) => {
 
 /*
 DELETE USER
-Deletes user + their bookings
 */
 export const deleteUserById = async (id: string) => {
   await Booking.deleteMany({ employee: id });

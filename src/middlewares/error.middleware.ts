@@ -2,25 +2,25 @@ import { Request, Response, NextFunction } from "express";
 import { validationResult } from "express-validator";
 import mongoose from "mongoose";
 
-/*
-Global Error Handling Middleware
- */
 export const errorMiddleware = (
   err: any,
   req: Request,
-  res: Response) => {
-  // Express Validator Errors
+  res: Response,
+  next: NextFunction
+) => {
+  console.error("🔥 ERROR:", err);
+
+  /* ================= VALIDATION ERRORS ================= */
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(422).json({                           //validation error
+    return res.status(422).json({
       success: false,
       message: "Validation failed",
       errors: errors.array(),
     });
   }
 
-  //Mongoose Validation Error
-
+  /* ================= MONGOOSE VALIDATION ================= */
   if (err instanceof mongoose.Error.ValidationError) {
     return res.status(400).json({
       success: false,
@@ -29,7 +29,7 @@ export const errorMiddleware = (
     });
   }
 
-  // Mongoose Cast Error (Invalid ObjectId)
+  /* ================= INVALID OBJECT ID ================= */
   if (err instanceof mongoose.Error.CastError) {
     return res.status(400).json({
       success: false,
@@ -37,8 +37,7 @@ export const errorMiddleware = (
     });
   }
 
-  //JWT Errors
-
+  /* ================= JWT ERRORS ================= */
   if (err.name === "JsonWebTokenError") {
     return res.status(401).json({
       success: false,
@@ -52,8 +51,8 @@ export const errorMiddleware = (
       message: "Token expired",
     });
   }
-  // Custom Application Errors (from services)
 
+  /* ================= CUSTOM APP ERRORS ================= */
   if (err.message) {
     return res.status(err.statusCode || 400).json({
       success: false,
@@ -61,7 +60,7 @@ export const errorMiddleware = (
     });
   }
 
-  // Fallback (Unknown Error)
+  /* ================= FALLBACK ================= */
   return res.status(500).json({
     success: false,
     message: "Internal server error",
