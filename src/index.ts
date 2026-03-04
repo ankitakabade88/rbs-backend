@@ -61,6 +61,11 @@ app.get("/", (_req, res) => {
   res.send("API is running 🚀");
 });
 
+/* ================= TEST ROUTE ================= */
+app.get("/test", (_req, res) => {
+  res.json({ message: "Backend working!" });
+});
+
 /* ================= API ROUTES ================= */
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
