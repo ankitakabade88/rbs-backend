@@ -6,12 +6,13 @@ import { JWT_SECRET, JWT_EXPIRES_IN } from "../../config/jwt";
 import { sendInviteEmail } from "../../utils/sendInviteEmail";
 
 /* =====================================================
-   LOGIN SERVICE
+LOGIN SERVICE
 ===================================================== */
 export const loginService = async (
   email: string,
   password: string
 ) => {
+
   const user = await User.findOne({
     email: email.toLowerCase(),
   }).select("+password");
@@ -25,9 +26,7 @@ export const loginService = async (
 
   if (!user.isActive) {
     throw Object.assign(
-      new Error(
-        "Account not activated. Please set your password using the invite link."
-      ),
+      new Error("Account not activated."),
       { statusCode: 403 }
     );
   }
@@ -60,31 +59,28 @@ export const loginService = async (
       email: user.email,
       role: user.role,
       isActive: user.isActive,
+      mustChangePassword: user.mustChangePassword
     },
   };
 };
 
 /* =====================================================
-   SET PASSWORD (INVITE ACTIVATION)
+SET PASSWORD (INVITE ACTIVATION)
 ===================================================== */
 export const setPasswordService = async (
   token: string,
   password: string
 ) => {
 
-  /* ================= HASH TOKEN ================= */
   const hashedToken = crypto
     .createHash("sha256")
     .update(token)
     .digest("hex");
 
-  /* =================================================
-     FIND USER (ALLOW OLD + NEW TOKENS)
-  ================================================= */
   const user = await User.findOne({
     $or: [
       { inviteToken: hashedToken },
-      { inviteToken: token }, // backward compatibility
+      { inviteToken: token },
     ],
   }).select("+password");
 
@@ -95,10 +91,10 @@ export const setPasswordService = async (
     );
   }
 
-  /* =================================================
-     TOKEN EXPIRED → AUTO REGENERATE 🔥
-  ================================================= */
-  if (!user.inviteTokenExpiry || user.inviteTokenExpiry < new Date()) {
+  if (
+    !user.inviteTokenExpiry ||
+    user.inviteTokenExpiry < new Date()
+  ) {
 
     const newToken = crypto.randomBytes(32).toString("hex");
 
@@ -108,6 +104,7 @@ export const setPasswordService = async (
       .digest("hex");
 
     user.inviteToken = newHashedToken;
+
     user.inviteTokenExpiry = new Date(
       Date.now() + 24 * 60 * 60 * 1000
     );
@@ -127,18 +124,17 @@ export const setPasswordService = async (
     );
   }
 
-  /* =================================================
-     ACTIVATE ACCOUNT
-  ================================================= */
+  /* ACTIVATE ACCOUNT */
+
   user.password = password;
   user.isActive = true;
+  user.mustChangePassword = true;
 
   user.inviteToken = undefined;
   user.inviteTokenExpiry = undefined;
 
   await user.save();
 
-  /* ================= JWT ================= */
   const jwtToken = jwt.sign(
     {
       id: user._id.toString(),
@@ -158,6 +154,49 @@ export const setPasswordService = async (
       email: user.email,
       role: user.role,
       isActive: user.isActive,
+      mustChangePassword: true,
     },
+  };
+};
+
+/* =====================================================
+CHANGE PASSWORD
+===================================================== */
+export const changePasswordService = async (
+  userId: string,
+  currentPassword: string,
+  newPassword: string
+) => {
+
+  const user = await User.findById(userId).select("+password");
+
+  if (!user || !user.password) {
+    throw Object.assign(
+      new Error("User not found"),
+      { statusCode: 404 }
+    );
+  }
+
+  const isMatch = await bcrypt.compare(
+    currentPassword,
+    user.password
+  );
+
+  if (!isMatch) {
+    throw Object.assign(
+      new Error("Current password incorrect"),
+      { statusCode: 400 }
+    );
+  }
+
+  user.password = newPassword;
+
+  /* Disable forced password change */
+  user.mustChangePassword = false;
+
+  await user.save();
+
+  return {
+    message: "Password changed successfully",
   };
 };

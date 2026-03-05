@@ -8,6 +8,9 @@ export interface IUser extends Document {
   role: "admin" | "employee";
   isActive: boolean;
 
+  /* ===== FORCE PASSWORD CHANGE ===== */
+  mustChangePassword: boolean;
+
   /* ===== RESET PASSWORD ===== */
   resetToken?: string | null;
   resetTokenExpiry?: Date | null;
@@ -51,6 +54,12 @@ const userSchema = new Schema<IUser>(
 
     /* user becomes active after setting password */
     isActive: {
+      type: Boolean,
+      default: false,
+    },
+
+    /* force change password on first login */
+    mustChangePassword: {
       type: Boolean,
       default: false,
     },

@@ -2,33 +2,28 @@ import { Request, Response } from "express";
 import {
   loginService,
   setPasswordService,
+  changePasswordService
 } from "../services/auth.service";
 
 /* =====================================================
-   LOGIN CONTROLLER
+LOGIN
 ===================================================== */
 export const login = async (req: Request, res: Response) => {
+
   try {
+
     const { email, password } = req.body;
 
     const data = await loginService(email, password);
 
-    /*
-      EXPECTED data FORMAT:
-      {
-        token: string,
-        user: { role: "admin" | "employee", ... }
-      }
-    */
-
-    /* ================= SET AUTH COOKIES ================= */
+    /* SET AUTH COOKIES */
 
     res.cookie("token", data.token, {
-      httpOnly: false,      // middleware must read it
+      httpOnly: false,
       sameSite: "lax",
-      secure: false,        // true in production (HTTPS)
+      secure: false,
       path: "/",
-      maxAge: 1000 * 60 * 60 * 24, // 1 day
+      maxAge: 1000 * 60 * 60 * 24
     });
 
     res.cookie("role", data.user.role, {
@@ -36,49 +31,42 @@ export const login = async (req: Request, res: Response) => {
       sameSite: "lax",
       secure: false,
       path: "/",
-      maxAge: 1000 * 60 * 60 * 24,
+      maxAge: 1000 * 60 * 60 * 24
     });
-
-    /* ================= RESPONSE ================= */
 
     res.status(200).json({
       success: true,
       message: "Login successful",
-      data,
+      ...data
     });
 
   } catch (error: any) {
+
     console.error("LOGIN ERROR:", error.message);
 
     res.status(error.statusCode || 500).json({
       success: false,
-      message: error.message || "Internal server error",
+      message: error.message || "Internal server error"
     });
   }
 };
 
 /* =====================================================
-   SET PASSWORD (INVITE ACTIVATION)
+SET PASSWORD
 ===================================================== */
 export const setPassword = async (
   req: Request,
   res: Response
 ) => {
+
   try {
+
     const { token, password } = req.body;
 
-    /* ===== BASIC VALIDATION ===== */
     if (!token || !password) {
       return res.status(400).json({
         success: false,
-        message: "Token and password are required",
-      });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: "Password must be at least 6 characters",
+        message: "Token and password required"
       });
     }
 
@@ -89,15 +77,53 @@ export const setPassword = async (
 
     res.status(200).json({
       success: true,
-      message: "Account activated successfully",
-      data,
+      message: "Account activated",
+      ...data
     });
+
   } catch (error: any) {
+
     console.error("SET PASSWORD ERROR:", error.message);
 
     res.status(error.statusCode || 500).json({
       success: false,
-      message: error.message || "Internal server error",
+      message: error.message || "Internal server error"
+    });
+  }
+};
+
+/* =====================================================
+CHANGE PASSWORD
+===================================================== */
+export const changePassword = async (
+  req: Request,
+  res: Response
+) => {
+
+  try {
+
+    const userId = (req as any).user?.id;
+
+    const { currentPassword, newPassword } = req.body;
+
+    const data = await changePasswordService(
+      userId,
+      currentPassword,
+      newPassword
+    );
+
+    res.status(200).json({
+      success: true,
+      ...data
+    });
+
+  } catch (error: any) {
+
+    console.error("CHANGE PASSWORD ERROR:", error.message);
+
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Internal server error"
     });
   }
 };

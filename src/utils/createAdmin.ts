@@ -1,7 +1,7 @@
 import User from "../models/user.model";
 
 export const createDefaultAdmin = async () => {
-  const adminEmail = "chikku@test.com";
+  const adminEmail = "ankitakabade2308@gmail.com";
 
   const existingAdmin = await User.findOne({ email: adminEmail });
   if (existingAdmin) {

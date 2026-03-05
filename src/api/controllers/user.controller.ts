@@ -1,17 +1,13 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
-import crypto from "crypto";
 
 import {
   createUser,
   findUsers,
   findUserById,
-  findUserByEmail,
   updateUserById,
   deleteUserById,
 } from "../services/user.service";
-
-import UserModel from "../../models/user.model";
 
 /* ================= HELPERS ================= */
 
@@ -30,92 +26,38 @@ const ensureAdminJWT = (req: Request, res: Response): boolean => {
 };
 
 /* =====================================================
-   CREATE USER (ADMIN INVITE FLOW)
+   CREATE USER (ADMIN CREATES USER WITH TEMP PASSWORD)
 ===================================================== */
 
-export const createUserController = async (req: Request, res: Response) => {
-  try {
-    if (!ensureAdminJWT(req, res)) return;
-
-    const { name, email, role } = req.body;
-
-    const inviteToken = crypto.randomBytes(32).toString("hex");
-
-    const user = await createUser({
-      name,
-      email,
-      role,
-      password: null,
-      isActive: false,
-      resetToken: inviteToken,
-      resetTokenExpiry: new Date(Date.now() + 60 * 60 * 1000),
-    });
-
-    const inviteLink =
-      `http://localhost:5173/set-password?token=${inviteToken}`;
-
-    res.status(201).json({
-      success: true,
-      message: "User invited successfully",
-      inviteLink,
-      data: user,
-    });
-  } catch (error: any) {
-    res.status(400).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-/* =====================================================
-   SET PASSWORD (ACCOUNT ACTIVATION)
-===================================================== */
-
-export const setPasswordController = async (
+export const createUserController = async (
   req: Request,
   res: Response
 ) => {
   try {
-    const { token, password } = req.body;
+    if (!ensureAdminJWT(req, res)) return;
 
-    if (!token || !password) {
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Token and password required",
+        message: "Name, email and temporary password are required",
       });
     }
 
-    const user = await UserModel.findOne({
-      resetToken: token,
-      resetTokenExpiry: { $gt: new Date() },
-    }).select("+password");
+    const user = await createUser({
+      name,
+      email,
+      password,
+      role: "employee",
+    });
 
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid or expired invite link",
-      });
-    }
-
-    // ✅ DO NOT HASH HERE (schema already hashes)
-    user.password = password;
-
-    // activate account
-    user.isActive = true;
-
-    // remove invite token
-    user.resetToken = null;
-    user.resetTokenExpiry = null;
-
-    await user.save();
-
-    res.status(200).json({
+    res.status(201).json({
       success: true,
-      message: "Account activated successfully",
+      data: user,
     });
   } catch (error: any) {
-    res.status(500).json({
+    res.status(400).json({
       success: false,
       message: error.message,
     });
@@ -131,7 +73,7 @@ export const getUsers = async (req: Request, res: Response) => {
     if (!ensureAdminJWT(req, res)) return;
 
     const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit);
+    const limit = Number(req.query.limit) || 20;
     const role = req.query.role as string | undefined;
 
     const filters: any = {};
@@ -141,7 +83,7 @@ export const getUsers = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      data: users, // includes isActive
+      data: users,
     });
   } catch (error: any) {
     res.status(500).json({
@@ -152,7 +94,7 @@ export const getUsers = async (req: Request, res: Response) => {
 };
 
 /* =====================================================
-   OTHER CONTROLLERS (UNCHANGED)
+   GET USER BY ID
 ===================================================== */
 
 export const getUserById = async (req: Request, res: Response) => {
@@ -170,35 +112,97 @@ export const getUserById = async (req: Request, res: Response) => {
 
     const user = await findUserById(id);
 
-    if (!user)
+    if (!user) {
       return res.status(404).json({
         success: false,
         message: "User not found",
       });
+    }
 
-    res.status(200).json({ success: true, data: user });
+    res.status(200).json({
+      success: true,
+      data: user,
+    });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
+
+/* =====================================================
+   UPDATE USER
+===================================================== */
+
+export const updateUser = async (req: Request, res: Response) => {
+  try {
+    if (!ensureAdminJWT(req, res)) return;
+
+    const { id } = req.params;
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID",
+      });
+    }
+
+    const updatedUser = await updateUserById(id, req.body);
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: updatedUser,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+/* =====================================================
+   DELETE USER
+===================================================== */
 
 export const deleteUser = async (req: Request, res: Response) => {
   try {
     if (!ensureAdminJWT(req, res)) return;
 
-    const user = await deleteUserById(req.params.id);
+    const { id } = req.params;
 
-    if (!user)
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID",
+      });
+    }
+
+    const user = await deleteUserById(id);
+
+    if (!user) {
       return res.status(404).json({
         success: false,
         message: "User not found",
       });
+    }
 
     res.status(200).json({
       success: true,
       message: "User deleted successfully",
     });
   } catch (error: any) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
