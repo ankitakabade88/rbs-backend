@@ -45,10 +45,21 @@ if (process.env.NODE_ENV === "production") {
 }
 
 /* ================= CORS ================= */
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://rbs-frontend1.vercel.app"
+];
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL,
-    credentials: true,
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true
   })
 );
 
