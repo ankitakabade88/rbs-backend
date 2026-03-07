@@ -72,9 +72,11 @@ app.get("/", (_req, res) => {
   res.send("API is running 🚀");
 });
 
-/* ================= TEST ROUTE ================= */
-app.get("/test", (_req, res) => {
-  res.json({ message: "Backend working!" });
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    status: "UP",
+    service: "RBS Backend"
+  });
 });
 
 /* ================= API ROUTES ================= */
