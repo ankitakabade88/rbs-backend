@@ -47,7 +47,8 @@ if (process.env.NODE_ENV === "production") {
 /* ================= CORS ================= */
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://rbs-frontend1.vercel.app"
+  "https://rbs-frontend1.vercel.app",
+  "http://localhost:3000",
 ];
 
 app.use(
